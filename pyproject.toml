@@ -1,0 +1,16 @@
+[project]
+name = "personal-finance-tracker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "bcrypt>=5.0.0",
+    "email-validator>=2.3.0",
+    "fastapi>=0.121.0",
+    "motor>=3.7.1",
+    "pydantic>=2.12.4",
+    "pydantic-settings>=2.11.0",
+    "python-jose>=3.5.0",
+    "uvicorn>=0.38.0",
+]
