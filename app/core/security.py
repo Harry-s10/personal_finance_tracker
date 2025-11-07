@@ -4,9 +4,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from pydantic import SecretStr
 
 from app.core.config import settings
 from app.core.exceptions import UserNotFoundError
+from app.services.user_service import UserService, get_user_service
 
 oauth2_schemes = OAuth2PasswordBearer("/users/login")
 
@@ -23,7 +25,7 @@ class SecurityService:
     def hash_password(self, password: str):
         return self.__pwd_content.hash(password)
 
-    def verify_password(self, plain_password: str, hashed_password: str):
+    def verify_password(self, plain_password: SecretStr, hashed_password: str):
         return self.__pwd_content.verify(plain_password, hashed_password)
 
     def create_access_token(self, subject: str):

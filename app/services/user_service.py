@@ -1,0 +1,91 @@
+from datetime import UTC, datetime
+
+from bson import ObjectId
+from fastapi import Depends
+
+from app.core.exceptions import (
+    InvalidCredentialsError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
+)
+from app.core.security import SecurityService, get_security_service
+from app.db.mongodb import MongoDBClient, get_mongodb_client
+from app.models.user_model import UserCreate, UserLogin, UserResponse, UserUpdate
+
+
+class UserService:
+    """Business logic layer for user operations."""
+
+    def __init__(
+        self,
+        mongo_client: MongoDBClient = Depends(get_mongodb_client),
+        security_service: SecurityService = Depends(get_security_service),
+    ):
+        self._collection = mongo_client.get_collection("users")
+        self._security = security_service
+
+    async def create(self, user_data: UserCreate) -> UserResponse:
+        existing_user = self.get_by_email(user_data.email)
+        if existing_user:
+            raise UserAlreadyExistsError("User already exist in DB")
+        user_dict = user_data.model_dump()
+        user_dict["password"] = self._security.hash_password(user_dict.get("password"))
+        result = await self._collection.insert_one(user_dict)
+        user = await self.get_by_id(result.inserted_id)
+        return self._build_user_response(user)
+
+    async def get_by_id(self, id: str):
+        if not ObjectId.is_valid(id):
+            raise UserNotFoundError("Invalid Object ID")
+        user = await self._collection.find_one({"_id": ObjectId(id)})
+        if not user:
+            raise UserNotFoundError("User not found")
+        return user
+
+    async def get_by_email(self, email: str):
+        user = await self._collection.find_one({"email": email})
+        if not user:
+            raise UserNotFoundError("User not found")
+        return user
+
+    async def update(self, id: str, updates: UserUpdate):
+        self.get_by_id(id)
+        update_data = updates.model_dump(exclude_unset=True)
+        if "password" in update_data:
+            update_data["password"] = self._security.hash_password(
+                update_data["password"]
+            )
+        update_data["updated_at"] = datetime.now(UTC)
+        await self._collection.update_one({"_id": ObjectId(id)}, {"$set": update_data})
+        updated_user = await self.get_by_id(id)
+        return self._build_user_response(updated_user)
+
+    async def delete(self, id: str):
+        if not ObjectId.is_valid(id):
+            raise UserNotFoundError("Invalid user ID format")
+        result = await self._collection.delete_one({"_id": ObjectId(id)})
+        if result.deleted_count == 0:
+            raise UserNotFoundError("User not found")
+        return True
+
+    async def authenticate_user(self, user_data: UserLogin):
+        user = self.get_by_email(user_data.email)
+        if self._security.verify_password(user_data.password, user["password"]):
+            raise InvalidCredentialsError("Incorrect email or password")
+        token = self._security.create_access_token(str(user["_id"]))
+        return dict(
+            access_token=token,
+            token_type="bearer",
+            user=self._build_user_response(user),
+        )
+
+    def _build_user_response(self, user: dict):
+        if not user:
+            return None
+        user["id"] = str(user.pop("_id"))
+        user.pop("password", None)
+        return UserResponse(**user)
+
+
+def get_user_service():
+    return UserService()
