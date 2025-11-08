@@ -4,8 +4,8 @@ from bson import ObjectId
 from fastapi import Depends
 
 from app.core.exceptions import (
+    DuplicateResourceError,
     InvalidCredentialsError,
-    UserAlreadyExistsError,
     UserNotFoundError,
 )
 from app.core.security import SecurityService, get_security_service
@@ -23,7 +23,7 @@ class UserService:
     async def create(self, user_data: UserCreate) -> UserResponse:
         existing_user = await self.get_by_email(user_data.email)
         if existing_user:
-            raise UserAlreadyExistsError("User with this email already exist in DB")
+            raise DuplicateResourceError("email")
 
         user_dict = user_data.model_dump()
         user_dict["password"] = self._security.hash_password(user_data.password)
@@ -36,10 +36,10 @@ class UserService:
 
     async def get_by_id(self, id: str):
         if not ObjectId.is_valid(id):
-            raise UserNotFoundError("Invalid user ID format")
+            raise UserNotFoundError()
         user = await self._collection.find_one({"_id": ObjectId(id)})
         if not user:
-            raise UserNotFoundError("User not found")
+            raise UserNotFoundError()
         return user
 
     async def get_by_email(self, email: str):
@@ -57,10 +57,10 @@ class UserService:
 
     async def delete(self, id: str):
         if not ObjectId.is_valid(id):
-            raise UserNotFoundError("Invalid user ID format")
+            raise UserNotFoundError()
         result = await self._collection.delete_one({"_id": ObjectId(id)})
         if result.deleted_count == 0:
-            raise UserNotFoundError("User not found")
+            raise UserNotFoundError()
         return True
 
     async def authenticate_user(self, user_data: UserLogin):
@@ -68,7 +68,7 @@ class UserService:
         if not user or not self._security.verify_password(
             user_data.password, user["password"]
         ):
-            raise InvalidCredentialsError("Incorrect email or password")
+            raise InvalidCredentialsError()
         token = self._security.create_access_token(str(user["_id"]))
         return dict(
             access_token=token,

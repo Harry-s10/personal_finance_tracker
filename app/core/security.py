@@ -6,6 +6,7 @@ from passlib.context import CryptContext
 from pydantic import SecretStr
 
 from app.core.config import settings
+from app.core.exceptions import InvalidTokenError
 
 oauth2_schemes = OAuth2PasswordBearer("/api/v1/users/login")
 
@@ -38,7 +39,7 @@ class SecurityService:
         try:
             return jwt.decode(token, self.__secret_key, [self.__algorithm])
         except JWTError:
-            raise ValueError("Invalid or expired token")
+            raise InvalidTokenError()
 
 
 _security_service = None

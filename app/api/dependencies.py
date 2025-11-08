@@ -1,6 +1,11 @@
-from fastapi import Depends, HTTPException, status
+from uuid import uuid4
 
-from app.core.exceptions import UserNotFoundError
+from fastapi import Depends
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+from app.core.exceptions import InvalidTokenError
 from app.core.security import SecurityService, get_security_service, oauth2_schemes
 from app.models.user_model import UserResponse
 from app.services.user_service import UserService, get_user_service
@@ -12,33 +17,24 @@ async def get_current_user(
     user_service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Validate JWT and return the authenticated user"""
-    try:
-        payload = security_service.decode_token(token)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    payload = security_service.decode_token(token)
 
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token payload invalid",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise InvalidTokenError("Invalid token payload")
 
-    try:
-        user = await user_service.get_by_id(user_id)
-    except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
+    user = await user_service.get_by_id(user_id)
     user_copy = dict(user)
     user_copy["id"] = str(user_copy.pop("_id"))
     user_copy.pop("password", None)
     return UserResponse(**user_copy)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = str(uuid4())
+        request.state.request_id = request_id
+
+        response: Response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response

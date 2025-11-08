@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.api.dependencies import get_current_user
 from app.models.user_model import (
@@ -9,20 +9,24 @@ from app.models.user_model import (
     UserUpdate,
 )
 from app.services.user_service import UserService, get_user_service
+from app.util.response_builder import build_success_response
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post(
     "/register",
-    response_model=UserResponse,
+    response_model=None,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
 )
 async def register_user(
-    user_data: UserCreate, user_service: UserService = Depends(get_user_service)
+    user_data: UserCreate,
+    request: Request,
+    user_service: UserService = Depends(get_user_service),
 ):
-    return await user_service.create(user_data)
+    new_user = await user_service.create(user_data)
+    return build_success_response(request, new_user, "User created successfully")
 
 
 @router.post(

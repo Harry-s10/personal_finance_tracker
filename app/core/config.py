@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +22,10 @@ class LogLevel(str, Enum):
 class Settings(BaseSettings):
     APP_NAME: Annotated[str, Field("Personal Finance Tracker")]
     ENVIRONMENT: Annotated[Environment, Field(Environment.LOCAL)]
+    # Log config
+    LOG_DIR: Annotated[str, Field("logs")]
+    LOG_FILE: Annotated[str, Field("app.log")]
+    LOG_FORMAT: Annotated[Literal["json", "text"], Field("text")]
     LOG_LEVEL: Annotated[LogLevel, Field(LogLevel.DEBUG)]
     # Database
     MONGO_URI: str
