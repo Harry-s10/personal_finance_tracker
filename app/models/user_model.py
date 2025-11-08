@@ -52,9 +52,7 @@ class UserLogin(BaseModelConfig):
             ..., description="User's registered email id", examples=["john@example.com"]
         ),
     ]
-    password: Annotated[
-        SecretStr, Field(..., min_length=2, description="User's registered password")
-    ]
+    password: Annotated[SecretStr, Field(..., description="User's registered password")]
 
     @field_validator("email")
     @classmethod
@@ -97,3 +95,9 @@ class UserResponse(BaseModelConfig):
     model_config = ConfigDict(
         extra="forbid", from_attributes=True, str_strip_whitespace=True
     )
+
+
+class TokenResponse(BaseModelConfig):
+    access_token: Annotated[str, Field(..., description="JWT access token")]
+    token_type: Annotated[str, Field("bearer", description="Token type")]
+    user: Annotated[UserResponse, Field(..., description="User details")]
